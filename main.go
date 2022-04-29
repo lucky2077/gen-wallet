@@ -68,7 +68,7 @@ func main() {
 			count++
 			if count%config.LogCount == 0 {
 				fmt.Printf(
-					"%d wallets generated, speed: %.f/s, time passed %.fs\n",
+					"%d wallets generated, speed: %.f/s, time elapsed %.fs\n",
 					count,
 					float64(count)/(time.Since(startTime).Seconds()),
 					time.Since(startTime).Seconds(),
