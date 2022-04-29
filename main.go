@@ -82,7 +82,6 @@ func main() {
 	}()
 
 	wg.Wait()
-	time.Sleep(time.Second * 1)
 	fmt.Println("main exited")
 }
 
