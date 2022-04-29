@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -41,30 +42,23 @@ func main() {
 
 	cancelCtx, cancel := context.WithCancel(context.Background())
 
-	finishCh := make(chan int)
-	countCh := make(chan int)
+	finishCh := make(chan int, config.Concurrent)
+	countCh := make(chan int, config.Concurrent)
 	defer close(finishCh)
 
-	for i := 0; i < config.Concurrent; i++ {
-		subCtx := context.WithValue(cancelCtx, contextKey("config"), config)
-		go genWorker(subCtx, finishCh, countCh, i)
-	}
+	wg := &sync.WaitGroup{}
 
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt)
+	for i := 0; i < config.Concurrent; i++ {
+		wg.Add(1)
+		subCtx := context.WithValue(cancelCtx, contextKey("config"), config)
+		go genWorker(subCtx, finishCh, countCh, i, wg)
+	}
 
 	var count int64
 	startTime := time.Now()
 
-	for {
-		select {
-		case <-c:
-			cancel()
-			_exit()
-		case <-finishCh:
-			cancel()
-			_exit()
-		case <-countCh:
+	go func() {
+		for range countCh {
 			count++
 			if count%config.LogCount == 0 {
 				fmt.Printf(
@@ -75,30 +69,46 @@ func main() {
 				)
 			}
 		}
-	}
-}
+	}()
 
-func _exit() {
-	fmt.Println("exiting")
-	time.Sleep(time.Second * 3)
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+
+	go func() {
+		for {
+			select {
+			case <-c:
+				cancel()
+				return
+			case <-finishCh:
+				cancel()
+				return
+			}
+		}
+	}()
+
+	wg.Wait()
+	time.Sleep(time.Second * 1)
 	fmt.Println("main exited")
-	os.Exit(0)
 }
 
-func genWorker(ctx context.Context, finish chan int, countCh chan int, index int) {
+func genWorker(ctx context.Context, finish chan int, countCh chan int, index int, wg *sync.WaitGroup) {
 	fmt.Printf("[worker %d] start\n", index)
 
 	config := ctx.Value(contextKey("config")).(*Config)
 	for {
 		select {
 		case <-ctx.Done():
+			wg.Done()
 			fmt.Printf("[worker %d] exited\n", index)
 			return
 		default:
 			if genWallet(config) {
+				fmt.Printf("[worker %d] success\n", index)
 				finish <- 1
+			} else {
+				countCh <- 1
 			}
-			countCh <- 1
 		}
 	}
 }
