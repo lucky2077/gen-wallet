@@ -44,6 +44,7 @@ func main() {
 	cancelCtx, cancel := context.WithCancel(context.Background())
 
 	finishCh := make(chan int, config.Concurrent)
+	defer close(finishCh)
 
 	wg := &sync.WaitGroup{}
 
@@ -56,6 +57,7 @@ func main() {
 	startTime := time.Now()
 
 	c := make(chan os.Signal, 1)
+	defer close(c)
 	signal.Notify(c, os.Interrupt)
 
 	tick := time.NewTicker(time.Second)
