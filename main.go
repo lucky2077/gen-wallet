@@ -21,25 +21,32 @@ type Config struct {
 	Prefix     string
 	Suffix     string
 	Concurrent int
+	LOG_LEVEL  int
 }
+
+const (
+	DEBUG = iota
+	INFO
+)
 
 type contextKey string
 
-func _init() *Config {
-	config := &Config{}
+var count int64
+var config *Config
+
+func _init() {
+	config = &Config{}
 
 	flag.StringVar(&config.Prefix, "prefix", "0x0000", "ERC20 wallet address prefix")
 	flag.StringVar(&config.Suffix, "suffix", "", "ERC20 wallet address suffix")
-	flag.IntVar(&config.Concurrent, "concurrent", MaxParallelism()-1, "number of goroutine")
+	flag.IntVar(&config.Concurrent, "concurrent", maxParallelism()-1, "number of goroutine")
+	flag.IntVar(&config.LOG_LEVEL, "log-level", INFO, "log level")
 
 	flag.Parse()
-	return config
 }
 
-var count int64
-
 func main() {
-	config := _init()
+	_init()
 
 	cancelCtx, cancel := context.WithCancel(context.Background())
 
@@ -50,7 +57,7 @@ func main() {
 
 	for i := 0; i < config.Concurrent; i++ {
 		wg.Add(1)
-		subCtx := context.WithValue(cancelCtx, contextKey("config"), config)
+		subCtx := context.WithValue(cancelCtx, contextKey("dummy"), "dummy")
 		go genWorker(subCtx, finishCh, i, wg)
 	}
 
@@ -73,7 +80,8 @@ func main() {
 				cancel()
 				return
 			case <-tick.C:
-				fmt.Printf(
+				printLog(
+					INFO,
 					"\r%d wallets generated, speed: %.f/s, time elapsed %.fs",
 					count,
 					float64(count)/(time.Since(startTime).Seconds()),
@@ -84,29 +92,27 @@ func main() {
 	}()
 
 	wg.Wait()
-	fmt.Println("main exited")
+	printLog(DEBUG, "main exited")
 }
 
-func genWorker(ctx context.Context, finish chan int, index int, wg *sync.WaitGroup) {
-	fmt.Printf("[worker %d] start\n", index)
+func genWorker(ctx context.Context, finishCh chan int, index int, wg *sync.WaitGroup) {
+	printLog(DEBUG, "[worker %d] start\n", index)
 
-	config := ctx.Value(contextKey("config")).(*Config)
 	for {
 		select {
 		case <-ctx.Done():
 			wg.Done()
-			fmt.Printf("[worker %d] exited\n", index)
+			printLog(DEBUG, "[worker %d] exit\n", index)
 			return
 		default:
-			if genWallet(config) {
-				fmt.Printf("[worker %d] success\n", index)
-				finish <- 1
+			if genWallet() {
+				finishCh <- 1
 			}
 		}
 	}
 }
 
-func genWallet(config *Config) bool {
+func genWallet() bool {
 	privateKey, _ := crypto.GenerateKey()
 	publicKey := privateKey.Public()
 	publicKeyECDSA, _ := publicKey.(*ecdsa.PublicKey)
@@ -115,20 +121,26 @@ func genWallet(config *Config) bool {
 	atomic.AddInt64(&count, 1)
 
 	if strings.HasPrefix(address, config.Prefix) && strings.HasSuffix(address, config.Suffix) {
-		fmt.Println("\nAddress:", address)
+		printLog(INFO, "\nAddress: %s\n", address)
 		privateKeyBytes := crypto.FromECDSA(privateKey)
-		fmt.Println("SAVE BUT DO NOT SHARE THIS (Private Key):", hexutil.Encode(privateKeyBytes))
+		printLog(INFO, "SAVE BUT DO NOT SHARE THIS (Private Key): %s\n", hexutil.Encode(privateKeyBytes))
 		return true
 	}
 
 	return false
 }
 
-func MaxParallelism() int {
+func maxParallelism() int {
 	maxProcs := runtime.GOMAXPROCS(0)
 	numCPU := runtime.NumCPU()
 	if maxProcs < numCPU {
 		return maxProcs
 	}
 	return numCPU
+}
+
+func printLog(level int, format string, a ...any) {
+	if config.LOG_LEVEL <= level {
+		fmt.Printf(format, a...)
+	}
 }
