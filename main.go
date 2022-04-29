@@ -74,7 +74,7 @@ func main() {
 				return
 			case <-tick.C:
 				fmt.Printf(
-					"%d wallets generated, speed: %.f/s, time elapsed %.fs\n",
+					"\r%d wallets generated, speed: %.f/s, time elapsed %.fs",
 					count,
 					float64(count)/(time.Since(startTime).Seconds()),
 					time.Since(startTime).Seconds(),
@@ -115,7 +115,7 @@ func genWallet(config *Config) bool {
 	atomic.AddInt64(&count, 1)
 
 	if strings.HasPrefix(address, config.Prefix) && strings.HasSuffix(address, config.Suffix) {
-		fmt.Println("Address:", address)
+		fmt.Println("\nAddress:", address)
 		privateKeyBytes := crypto.FromECDSA(privateKey)
 		fmt.Println("SAVE BUT DO NOT SHARE THIS (Private Key):", hexutil.Encode(privateKeyBytes))
 		return true
