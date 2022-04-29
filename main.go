@@ -18,10 +18,11 @@ import (
 )
 
 type Config struct {
-	Prefix     string
-	Suffix     string
-	Concurrent int
-	LOG_LEVEL  int
+	Prefix             string
+	Suffix             string
+	Concurrent         int
+	LOG_LEVEL          int
+	CountPerGeneration int
 }
 
 const (
@@ -41,6 +42,7 @@ func _init() {
 	flag.StringVar(&config.Suffix, "suffix", "", "ERC20 wallet address suffix")
 	flag.IntVar(&config.Concurrent, "concurrent", maxParallelism()-1, "number of goroutine")
 	flag.IntVar(&config.LOG_LEVEL, "log-level", INFO, "log level")
+	flag.IntVar(&config.CountPerGeneration, "count-per-generation", 10, "number of wallet per genWallet()")
 
 	flag.Parse()
 }
@@ -113,18 +115,20 @@ func genWorker(ctx context.Context, finishCh chan int, index int, wg *sync.WaitG
 }
 
 func genWallet() bool {
-	privateKey, _ := crypto.GenerateKey()
-	publicKey := privateKey.Public()
-	publicKeyECDSA, _ := publicKey.(*ecdsa.PublicKey)
-	address := crypto.PubkeyToAddress(*publicKeyECDSA).Hex()
+	for i := 0; i < config.CountPerGeneration; i++ {
+		privateKey, _ := crypto.GenerateKey()
+		publicKey := privateKey.Public()
+		publicKeyECDSA, _ := publicKey.(*ecdsa.PublicKey)
+		address := crypto.PubkeyToAddress(*publicKeyECDSA).Hex()
 
-	atomic.AddInt64(&count, 1)
+		atomic.AddInt64(&count, 1)
 
-	if strings.HasPrefix(address, config.Prefix) && strings.HasSuffix(address, config.Suffix) {
-		printLog(INFO, "\nAddress: %s\n", address)
-		privateKeyBytes := crypto.FromECDSA(privateKey)
-		printLog(INFO, "SAVE BUT DO NOT SHARE THIS (Private Key): %s\n", hexutil.Encode(privateKeyBytes))
-		return true
+		if strings.HasPrefix(address, config.Prefix) && strings.HasSuffix(address, config.Suffix) {
+			printLog(INFO, "\nAddress: %s\n", address)
+			privateKeyBytes := crypto.FromECDSA(privateKey)
+			printLog(INFO, "SAVE BUT DO NOT SHARE THIS (Private Key): %s\n", hexutil.Encode(privateKeyBytes))
+			return true
+		}
 	}
 
 	return false
