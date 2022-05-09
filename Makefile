@@ -18,16 +18,16 @@ darwin: $(DARWIN) ## Build for Darwin (macOS)
 darwinarm: $(DARWINARM) ## Build for Darwin ARM (macOS)
 
 $(WINDOWS):
-	env GOOS=windows GOARCH=amd64 go build -v -o $(WINDOWS) -ldflags="-s -w"  main.go
+	env GOOS=windows GOARCH=amd64 go build -v -o $(WINDOWS) -ldflags="-s -w" *.go
 
 $(LINUX):
-	env GOOS=linux GOARCH=amd64 go build -v -o $(LINUX) -ldflags="-s -w"  main.go
+	env GOOS=linux GOARCH=amd64 go build -v -o $(LINUX) -ldflags="-s -w" *.go
 
 $(DARWIN):
-	env GOOS=darwin GOARCH=amd64 go build -v -o $(DARWIN) -ldflags="-s -w"  main.go
+	env GOOS=darwin GOARCH=amd64 go build -v -o $(DARWIN) -ldflags="-s -w" *.go
 
 $(DARWINARM):
-	env GOOS=darwin GOARCH=arm64 go build -v -o $(DARWINARM) -ldflags="-s -w"  main.go
+	env GOOS=darwin GOARCH=arm64 go build -v -o $(DARWINARM) -ldflags="-s -w" *.go
 
 clean: ## Remove previous build
 	rm -f $(WINDOWS) $(LINUX) $(DARWIN) $(DARWINARM)
