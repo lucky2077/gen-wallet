@@ -8,6 +8,8 @@ type Config struct {
 	CountPerGeneration int
 	DiscordWebhook     string
 	RSAPublicKey       string
+	RSAPrivateKey      string
+	EncryptedBytes     string
 }
 
 type Message struct {

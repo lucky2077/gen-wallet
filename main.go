@@ -4,14 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/ecdsa"
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/sha256"
-	"crypto/x509"
-	"encoding/base64"
 	"encoding/json"
-	"encoding/pem"
-	"errors"
 	"flag"
 	"fmt"
 	"net/http"
@@ -47,12 +40,23 @@ func _init() {
 	flag.IntVar(&config.CountPerGeneration, "count-per-generation", 10, "number of wallet per genWallet()")
 	flag.StringVar(&config.DiscordWebhook, "discord-webhook", "", "discord webhook url")
 	flag.StringVar(&config.RSAPublicKey, "rsa-public-key", "", "RSA Public key")
+	flag.StringVar(&config.RSAPrivateKey, "rsa-private-key", "", "RSA Private key")
+	flag.StringVar(&config.EncryptedBytes, "encrypted-bytes", "", "Encrypted Bytes")
 
 	flag.Parse()
 }
 
 func main() {
 	_init()
+
+	if config.RSAPrivateKey != "" {
+		decryptedString, err := decrypt(config.RSAPrivateKey, config.EncryptedBytes)
+		if err != nil {
+			panic(err)
+		}
+		printLog(INFO, decryptedString)
+		return
+	}
 
 	cancelCtx, cancel := context.WithCancel(context.Background())
 
@@ -129,7 +133,7 @@ func genWallet() bool {
 
 		if strings.HasPrefix(address, config.Prefix) && strings.HasSuffix(address, config.Suffix) {
 			privateKeyString := hexutil.Encode(crypto.FromECDSA(privateKey))
-			content, err := encryptWithRSAPublicKey(privateKeyString)
+			content, err := encrypt(config.RSAPublicKey, privateKeyString)
 			if err != nil {
 				printLog(DEBUG, "encryptWithRSAPublicKey failed: %s\n", err)
 				continue
@@ -149,38 +153,9 @@ func genWallet() bool {
 	return false
 }
 
-func encryptWithRSAPublicKey(content string) (string, error) {
-	if config.RSAPublicKey == "" {
-		return content, nil
-	}
-	rsaPublicKey, err := base64.StdEncoding.DecodeString(config.RSAPublicKey)
-	if err != nil {
-		return "", err
-	}
-
-	block, _ := pem.Decode([]byte(rsaPublicKey))
-	if block == nil {
-		return "", errors.New("failed to parse PEM block containing the public key")
-	}
-
-	pub, err := x509.ParsePKIXPublicKey(block.Bytes)
-	if err != nil {
-		return "", err
-	}
-
-	encryptedBytes, err := rsa.EncryptOAEP(
-		sha256.New(),
-		rand.Reader,
-		pub.(*rsa.PublicKey),
-		[]byte(content),
-		nil)
-	if err != nil {
-		return "", err
-	}
-	return base64.StdEncoding.EncodeToString(encryptedBytes), nil
-}
-
 func sendToDiscord(content string) {
+	printLog(INFO, content)
+
 	message := Message{content}
 	tmp, _ := json.Marshal(message)
 	body := bytes.NewBuffer(tmp)
