@@ -2,7 +2,7 @@ module github.com/lucky2077/gen-wallet
 
 go 1.21.11
 
-require github.com/ethereum/go-ethereum v1.14.5
+require github.com/ethereum/go-ethereum v1.14.6
 
 require (
 	github.com/btcsuite/btcd/btcec/v2 v2.3.2 // indirect
